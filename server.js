@@ -1,86 +1,124 @@
 import express from 'express';
-import mongoose from 'mongoose';
-import cors from 'cors';
+import fs from 'fs';
 import path from 'path';
+import cors from 'cors';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-mongoose.connect('mongodb://localhost:27017/pixelxstats', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-});
+const DATA_FILE = path.join(__dirname, 'data.json');
 
-const visitSchema = new mongoose.Schema({
-    site: String,
-    page: String,
-    ip: String,
-    userAgent: String,
-    referrer: String,
-    timestamp: { type: Date, default: Date.now }
-});
+function readData() {
+    if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, '{}');
+    return JSON.parse(fs.readFileSync(DATA_FILE));
+}
 
-const Visit = mongoose.model('Visit', visitSchema);
+function writeData(data) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
 
-// 🔸 API de tracking
-app.post('/api/track', async (req, res) => {
+// 📡 API pour enregistrer les visites
+app.post('/api/track', (req, res) => {
     const { site, page, referrer, userAgent } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    await Visit.create({ site, page, ip, userAgent, referrer });
+    const timestamp = Date.now();
+
+    const data = readData();
+    if (!data[site]) data[site] = [];
+    data[site].push({ page, referrer, userAgent, ip, timestamp });
+
+    writeData(data);
     res.json({ status: 'ok' });
 });
 
-// 🔸 API de stats
-app.get('/api/stats/:site', async (req, res) => {
-    const site = req.params.site;
-    const total = await Visit.countDocuments({ site });
-    const now = new Date();
-    const activeSince = new Date(now.getTime() - 5 * 60 * 1000);
-    const active = await Visit.countDocuments({ site, timestamp: { $gte: activeSince } });
+// 📊 API pour récupérer les stats de tous les sites
+app.get('/api/sites', (req, res) => {
+    const data = readData();
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
 
-    res.json({ site, totalVisitors: total, activeVisitors: active });
+    const sites = Object.keys(data).map(site => {
+        const visits = data[site];
+        const total = visits.length;
+        const active = visits.filter(v => now - v.timestamp <= fiveMinutes).length;
+        const lastVisit = visits.length > 0 ? visits[visits.length - 1].timestamp : null;
+
+        return {
+            site,
+            totalVisitors: total,
+            activeVisitors: active,
+            lastVisit
+        };
+    });
+
+    res.json(sites);
 });
 
-// 🔸 Dashboard HTML par défaut
+// 📌 Dashboard accessible via /dashboard
 app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+    res.send(`
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dashboard PixelX Stats</title>
+  <style>
+    body { font-family: Arial; background: #f6f8fa; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; background: white; }
+    th, td { padding: 10px; border-bottom: 1px solid #ddd; }
+    th { background: #007bff; color: white; }
+    tr:hover { background: #f1f1f1; }
+    .active { color: green; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>📊 PixelX — Statistiques des sites connectés</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Site</th>
+        <th>Visiteurs actifs</th>
+        <th>Total visiteurs</th>
+        <th>Dernière activité</th>
+      </tr>
+    </thead>
+    <tbody id="siteList"></tbody>
+  </table>
+
+  <script>
+    async function fetchSites() {
+      const res = await fetch('/api/sites');
+      const sites = await res.json();
+      const tbody = document.getElementById('siteList');
+      tbody.innerHTML = '';
+
+      sites.forEach(site => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = \`
+          <td>\${site.site}</td>
+          <td class="\${site.activeVisitors > 0 ? 'active' : ''}">\${site.activeVisitors}</td>
+          <td>\${site.totalVisitors}</td>
+          <td>\${site.lastVisit ? new Date(site.lastVisit).toLocaleString() : '-'}</td>
+        \`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    fetchSites();
+    setInterval(fetchSites, 10000);
+  </script>
+</body>
+</html>
+  `);
 });
 
-// Nouvelle route : liste tous les sites + stats
-app.get('/api/sites', async (req, res) => {
-    // Récupérer tous les noms de sites uniques
-    const sites = await Visit.aggregate([
-        { $group: { _id: '$site', lastVisit: { $max: '$timestamp' }, total: { $sum: 1 } } },
-        { $sort: { lastVisit: -1 } }
-    ]);
-
-    const now = new Date();
-    const activeSince = new Date(now.getTime() - 5 * 60 * 1000);
-
-    // Pour chaque site, calculer le nombre de visiteurs actifs
-    const result = await Promise.all(
-        sites.map(async s => {
-            const activeCount = await Visit.countDocuments({
-                site: s._id,
-                timestamp: { $gte: activeSince }
-            });
-            return {
-                site: s._id,
-                totalVisitors: s.total,
-                activeVisitors: activeCount,
-                lastVisit: s.lastVisit
-            };
-        })
-    );
-
-    res.json(result);
+app.listen(3000, () => {
+    console.log('✅ Serveur en ligne : http://localhost:3000');
 });
-
-
-app.listen(3000, () => console.log('✅ Serveur en ligne sur http://localhost:3000'));
