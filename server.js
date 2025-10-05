@@ -52,15 +52,16 @@ app.get('/api/sites', (req, res) => {
         const total = visits.length;
         const active = visits.filter(v => now - v.timestamp <= fiveMinutes).length;
         const lastVisit = visits.length > 0 ? visits[visits.length - 1].timestamp : null;
+        const lastIp = visits.length > 0 ? visits[visits.length - 1].ip : null;
 
         return {
             site,
             totalVisitors: total,
             activeVisitors: active,
-            lastVisit
+            lastVisit,
+            lastIp
         };
     });
-
     res.json(sites);
 });
 
@@ -155,6 +156,7 @@ app.get('/dashboard', (req, res) => {
         <th>Site</th>
         <th>Visiteurs actifs</th>
         <th>Total visiteurs</th>
+        <th>Dernière IP</th>
         <th>Dernière activité</th>
       </tr>
     </thead>
@@ -245,6 +247,7 @@ app.get('/dashboard', (req, res) => {
         <td>\${s.site}</td>
         <td class="\${s.activeVisitors>0?'active':''}">\${s.activeVisitors}</td>
         <td>\${s.totalVisitors}</td>
+        <td>\${s.lastIp || '-'}</td>
         <td>\${s.lastVisit?new Date(s.lastVisit).toLocaleString():'-'}</td>
       \`;
       tbody.appendChild(tr);

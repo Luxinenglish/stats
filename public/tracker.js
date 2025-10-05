@@ -10,7 +10,9 @@
     fetch('https://stat.pixelserver.fr/api/track', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': '',
+            'X-Real-IP': ''
         },
         body: JSON.stringify({
             site,
