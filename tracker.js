@@ -4,7 +4,7 @@
     const referrer = document.referrer;
     const userAgent = navigator.userAgent;
 
-    fetch('https://stat.pixelxserver.fr/api/track', {
+    fetch('https://stat.pixelserver.fr/api/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ site, page, referrer, userAgent })
