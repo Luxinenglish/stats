@@ -290,7 +290,7 @@ app.get('/dashboard', (req, res) => {
 });
 
 // 🚀 Lancement
-const PORT = 1000;
+const PORT = 1100;
 app.listen(PORT, () => {
     console.log(`✅ Pixel Stats en ligne sur http://localhost:${PORT}/dashboard`);
 });
