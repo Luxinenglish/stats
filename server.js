@@ -1,4 +1,4 @@
-import express from 'express';
+mport express from 'express';
 import fs from 'fs';
 import path from 'path';
 import cors from 'cors';
@@ -23,7 +23,7 @@ function writeData(data) {
     fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-// 📡 API pour enregistrer les visites
+// 📡 Enregistrer les visites
 app.post('/api/track', (req, res) => {
     const { site, page, referrer, userAgent } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -37,7 +37,7 @@ app.post('/api/track', (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// 📊 API pour récupérer les stats de tous les sites
+// 📊 Stats pour tous les sites
 app.get('/api/sites', (req, res) => {
     const data = readData();
     const now = Date.now();
@@ -60,14 +60,14 @@ app.get('/api/sites', (req, res) => {
     res.json(sites);
 });
 
-// 📌 Dashboard accessible via /dashboard
+// 🧭 Dashboard accessible via /dashboard
 app.get('/dashboard', (req, res) => {
     res.send(`
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Dashboard PixelX Stats</title>
+  <title>Dashboard Pixel Stats</title>
   <style>
     body { font-family: Arial; background: #f6f8fa; padding: 20px; }
     h1 { text-align: center; margin-bottom: 20px; }
@@ -79,7 +79,7 @@ app.get('/dashboard', (req, res) => {
   </style>
 </head>
 <body>
-  <h1>📊 PixelX — Statistiques des sites connectés</h1>
+  <h1>📊 Pixel Stats — Statistiques des sites connectés</h1>
   <table>
     <thead>
       <tr>
@@ -120,5 +120,5 @@ app.get('/dashboard', (req, res) => {
 });
 
 app.listen(3000, () => {
-    console.log('✅ Serveur en ligne : http://localhost:3000');
+    console.log('✅ Pixel Stats lancé sur http://localhost:3000');
 });
