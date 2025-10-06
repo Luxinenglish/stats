@@ -81,6 +81,32 @@ app.get('/api/stats/weekly', (req, res) => {
     res.json(weeklyStats);
 });
 
+// 📈 Statistiques des 24 dernières heures (par heure)
+app.get('/api/stats/hourly', (req, res) => {
+    const data = readData();
+    const now = Date.now();
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+
+    const hourlyData = Array(24).fill(0).map((_, i) => {
+        const hourStart = now - (23 - i) * 60 * 60 * 1000;
+        const hourEnd = hourStart + 60 * 60 * 1000;
+
+        let count = 0;
+        Object.keys(data).forEach(site => {
+            const visits = data[site];
+            count += visits.filter(v => v.timestamp >= hourStart && v.timestamp < hourEnd).length;
+        });
+
+        const date = new Date(hourStart);
+        return {
+            hour: date.getHours() + 'h',
+            count
+        };
+    });
+
+    res.json(hourlyData);
+});
+
 // 🔀 Fusion de deux sites en un seul
 app.post('/api/sites/merge', (req, res) => {
     const { a, b, into } = req.body;
@@ -164,7 +190,9 @@ app.get('/dashboard', (req, res) => {
   </table>
 
   <canvas id="weeklyPieChart" height="80" style="max-height: 400px; margin-top: 20px;"></canvas>
-</div>
+  
+  <h2 style="text-align: center; color: #007bff; margin-top: 30px;">📈 Activité des 24 dernières heures</h2>
+  <canvas id="hourlyChart" height="100"></canvas>
 
 <script>
   const ctxCombined = document.getElementById('combinedChart').getContext('2d');
@@ -217,6 +245,30 @@ app.get('/dashboard', (req, res) => {
     }
   });
 
+  const hourlyChart = new Chart(document.getElementById('hourlyChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Visites par heure',
+        data: [],
+        backgroundColor: 'rgba(0, 123, 255, 0.6)',
+        borderColor: '#007bff',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Heure' } },
+        y: { beginAtZero: true, title: { display: true, text: 'Nombre de visites' } }
+      }
+    }
+  });
+  
   async function fetchWeeklyStats() {
     const res = await fetch('/api/stats/weekly');
     const stats = await res.json();
@@ -227,6 +279,14 @@ app.get('/dashboard', (req, res) => {
     weeklyPieChart.data.datasets[0].data = values;
     weeklyPieChart.data.datasets[0].backgroundColor = colors;
     weeklyPieChart.update();
+  }
+
+  async function fetchHourlyStats() {
+    const res = await fetch('/api/stats/hourly');
+    const hourlyData = await res.json();
+    hourlyChart.data.labels = hourlyData.map(h => h.hour);
+    hourlyChart.data.datasets[0].data = hourlyData.map(h => h.count);
+    hourlyChart.update();
   }
 
   async function fetchSites() {
@@ -283,8 +343,10 @@ app.get('/dashboard', (req, res) => {
 
   fetchSites();
   fetchWeeklyStats();
+  fetchHourlyStats();
   setInterval(fetchSites, 10000);
   setInterval(fetchWeeklyStats, 30000);
+  setInterval(fetchHourlyStats, 60000);
 </script>
 
 </body>
